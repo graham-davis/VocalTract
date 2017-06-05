@@ -16,7 +16,6 @@ itfreq = hslider("freq[unit:Hz]", 200, 100, 300, 1) : si.smoo;
 voicing = hslider("voicing", 0.7, 0.0, 1.0, 0.01) : si.smoo;
 cutoff = hslider("cutoff", 2000, 1000, 10000, 5) : si.smoo;
 lip = hslider("lip", 0.1, 0.1, 0.95, 0.01) : si.smoo;
-nostril = hslider("nostril", 0.99, 0.1, 0.99, 0.01) : si.smoo;
 velum = hslider("velum", 0.01, 0.0, 0.4, 0.01) : si.smoo;
 th = hslider("tongue height", 0.0, 0.0, 0.7, 0.01) : si.smoo;
 tc = hslider("tongue center", 8.0, 2.0, 15.0, 1.0);
@@ -99,16 +98,12 @@ finalOutput(x1, y1, z1, x2, y2, z2) = x1+x2, y1+y2, z1+z2;
 glottis = (voicing*voiced) + ((1-voicing) * breath) 
 with {
 	voiced = os.imptrain(freq) : fi.peak_eq(3.5, freq, 50.0) : fi.lowpass(1, voicing*lCutoff + 10);
-	//breath = 0.5*(no.noise <: 0.05*fi.bandpass(4, 450, 850), 0.1*fi.highpass(4, 6000) :> +);
 	breath = 0.1*(no.noise : fi.bandpass(4, 500, 1500));
 	freq = itfreq + 0.05*os.osci(3);
 };	
 
 // Lips model
 lips = _ : fi.lowpass(2, (1-lip)*lCutoff) : _;			// Lip Transmission 
-
-// Nostrils model
-nostrils = _ : fi.lowpass(2, (1-nostril)*nCutoff) : _; // Nostril Transmission 
 
 // Upper vocal tract
 uVocalTract = pm.chain(
@@ -165,7 +160,6 @@ lVocalTract = pm.chain(
 // 				INSTANCE VARIABLES + METHODS		   
 // ----------------------------------------------------
 lCutoff = 1500;
-nCutoff = 1000;
 
 lipReflection = -0.85;
 glottalReflection = 0.7;
