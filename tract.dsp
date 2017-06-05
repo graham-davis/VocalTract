@@ -21,6 +21,8 @@ velum = hslider("velum", 0.01, 0.0, 0.4, 0.01) : si.smoo;
 th = hslider("tongue height", 0.0, 0.0, 0.7, 0.01) : si.smoo;
 tc = hslider("tongue center", 8.0, 2.0, 15.0, 1.0);
 
+
+// VOCAL TRACT DIAMETERS
 w1 = 0.6;
 w2 = 0.6;
 w3 = 0.6;
@@ -48,33 +50,57 @@ w22 = 1.5;
 w23 = 1.5;
 w24 = 1.5;
 
+
+// NASAL CAVITY DIAMETERS
+nw1 = velum;
+nw2 = 0.61;
+nw3 = 0.83;
+nw4 = 1.04;
+nw5 = 1.25;
+nw6 = 1.47;
+nw7 = 1.68;
+nw8 = 1.89;
+nw9 = 1.9;
+nw10 = 1.7;
+nw11 = 1.5;
+nw12 = 1.3;
+nw13 = 1.1;
+nw14 = 0.9;
+nw15 = 0.7;
 // ----------------------------------------------------
 // 						PROCESS METHOD
 // ----------------------------------------------------
 
 // Glotal input
-//process = glottis : fullVocalTract <: _,_;
+process = glottis : fullVocalTract <: _,_;
 
 // VST input
-process = fullVocalTract <: _,_;
+//process = fullVocalTract <: _,_;
 
 // ----------------------------------------------------
 // 					MODEL IMPLEMENTATIONS
 // ----------------------------------------------------
 
-fullVocalTract(x) = pm.endChain(pm.chain(pm.inRightWave(x) : lVocalTract : pm.out)) : lips;
+fullVocalTract(x) = pm.endChain(pm.chain(pm.inRightWave(x) : lVocalTract : threeWayJunction : upperSystem : pm.out));
+
+// Summed pressure of three way junction connecting lower tract and upper system
+threeWayJunction(x, y, z) = x+y, x+y, z;
 
 // System including both mouth and nasal cavity
-upperSystem(x, y, z) = 	(x, y, z) : uVocalTract : lipOutput;
+upperSystem(x, y, z) = 	(x, y, z) <: (uVocalTract : lipOutput), nasalCavity : finalOutput;
 
+// Filter output through lips
 lipOutput = _ , (_ : lips), _;
+
+// Combine outputs of nasal cavity and upper vocal tract
+finalOutput(x1, y1, z1, x2, y2, z2) = x1+x2, y1+y2, z1+z2;
 
 // Glottis model 
 glottis = (voicing*voiced) + ((1-voicing) * breath) 
 with {
 	voiced = os.imptrain(freq) : fi.peak_eq(3.5, freq, 50.0) : fi.lowpass(1, voicing*lCutoff + 10);
 	//breath = 0.5*(no.noise <: 0.05*fi.bandpass(4, 450, 850), 0.1*fi.highpass(4, 6000) :> +);
-	breath = 0.05*(no.noise : fi.bandpass(4, 450, 1500));
+	breath = 0.1*(no.noise : fi.bandpass(4, 500, 1500));
 	freq = itfreq + 0.05*os.osci(3);
 };	
 
@@ -86,22 +112,7 @@ nostrils = _ : fi.lowpass(2, (1-nostril)*nCutoff) : _; // Nostril Transmission
 
 // Upper vocal tract
 uVocalTract = pm.chain(
-	 section(-0.3, k(w5, w6))
-	);
-
-// Nasal cavity
-nasalCavity = pm.chain(
-	tube
-	);
-
-// Lower vocal tract
-lVocalTract = pm.chain(
-	 fsection(glottalReflection, k(w1, w2)) : 
-	 section(k(w1, w2), k(w2, w3)) :
-	 section(k(w2, w3), k(w3, w4)) :
-	 section(k(w3, w4), k(w4, w5)) :
-	 section(k(w4, w5), k(w5, w6)) :
-	 section(k(w5, w6), k(w6, w7)) :
+	 tlsection(ak(w6, w5, nw1), k(w6, w7)) :
 	 section(k(w6, w7), k(w7, w8)) :
 	 section(k(w7, w8), k(w8, w9)) :
 	 section(k(w8, w9), k(w9, w10)) :
@@ -119,7 +130,36 @@ lVocalTract = pm.chain(
 	 section(k(w20, w21), k(w21, w22)) :
 	 section(k(w21, w22), k(w22, w23)) :
  	 section(k(w22, w23), k(w23, w24)) :
-	 lsection(k(w23, w24), lipReflection));
+	 rsection(k(w23, w24), lipReflection)
+	);
+
+// Nasal cavity
+nasalCavity = pm.chain(
+	 tlsection(ak(nw1, w5, w6), k(nw1, nw2)) :
+	 section(k(nw1, nw2), k(nw2, nw3)) :
+	 section(k(nw2, nw3), k(nw3, nw4)) :
+	 section(k(nw3, nw4), k(nw4, nw5)) :
+	 section(k(nw4, nw5), k(nw5, nw6)) :
+	 section(k(nw5, nw6), k(nw6, nw7)) :
+	 section(k(nw6, nw7), k(nw7, nw8)) :
+	 section(k(nw7, nw8), k(nw8, nw9)) :
+	 section(k(nw8, nw9), k(nw9, nw10)) :
+	 section(k(nw9, nw10), k(nw10, nw11)) :
+	 section(k(nw10, nw11), k(nw11, nw12)) :
+ 	 section(k(nw11, nw12), k(nw12, nw13)) :
+	 section(k(nw12, nw13), k(nw13, nw14)) :
+	 section(k(nw13, nw14), k(nw14, nw15)) :
+	 rsection(k(nw14, nw15), lipReflection)
+	);
+
+// Lower vocal tract
+lVocalTract = pm.chain(
+	 lsection(glottalReflection, k(w1, w2)) : 
+	 section(k(w1, w2), k(w2, w3)) :
+	 section(k(w2, w3), k(w3, w4)) :
+	 section(k(w3, w4), k(w4, w5)) :
+	 trsection(k(w4, w5), ak(w5, w6, nw1))
+	);
 
 // ----------------------------------------------------
 // 				INSTANCE VARIABLES + METHODS		   
@@ -135,18 +175,29 @@ nMax = 100;									// Max delay
 n = 1;
 tube = pm.openTube(nMax, n);				// Tube wave guide
 
-lsection(lk, rk) = (_, *(1+lk), _) : 
+rsection(lk, rk) = (_, *(1+lk), _) : 
 	pm.terminations(*(-lk), pm.chain( tube ), *(rk));
 
-fsection(lk, rk) = (*(1-rk), _, _) : 
+lsection(lk, rk) = (*(1-rk), _, _) : 
 	pm.terminations(*(-lk), pm.chain( tube ), *(rk));
 
 section(lk, rk) = (*(1-rk), *(1+lk), _) : 
-	pm.terminations(*(-lk), pm.chain( tube ), *(rk));				
+	pm.terminations(*(-lk), pm.chain( tube ), *(rk));	
+
+tlsection(a, rk) = (*(1-rk), _, _) : 
+	pm.terminations(*(-1), pm.chain( tube ), *(rk)) :
+	(*(a), _, _);
+
+trsection(lk, a) = ( _, *(1+lk), _) : 
+	pm.terminations(*(-lk), pm.chain( tube ), *(-1)) :
+	(_, *(a), _);			
 
 area(d) = ((d/2)^2);					// Compute cross sectional area from diameter
 k(d1, d2) = (area(d2) - area(d1)) 
 			/ (area(d2) + area(d1));	// Calculate reflection coefficient from diameter (cm)
+
+// Calculate 3 way junction coefficient
+ak(d1, d2, d3) = 2*(area(d1)/(area(d1)+area(d2)+area(d3)));
 
 // Calculate tongue effect on specific tube segment
 tongue(index) = ma.fmax(ma.fmin(-trueIndex^2 + th, 1.0), -1.0)
